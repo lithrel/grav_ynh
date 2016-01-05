@@ -1,0 +1,63 @@
+#!/bin/bash
+set -e
+app=grav
+SCRIPTPATH=$( cd $(dirname $0) ; pwd -P )
+
+# Retrieve arguments
+domain=$1
+path=$2
+is_public=$3
+install_admin=$4
+
+# Removal of trailing /
+    if [ "$path" = "/" ]; then
+        echo "Installation on the root of the domain"
+    else
+        path=${path%/}
+    fi
+
+# Check domain/path availability
+sudo yunohost app checkurl $domain$path -a $app \
+    || (echo "Path not available: $domain$path" && exit 1)
+
+# Save app settings
+sudo yunohost app setting $app admin -v "$admin"
+sudo yunohost app setting $app is_public -v "$is_public"
+
+# Create source directory
+final_path=/var/www/$app
+sudo mkdir -p $final_path
+sudo chown -R www-data: $final_path
+
+# Modify Nginx configuration file and copy it to Nginx conf directory
+sudo sed -i "s@PATHTOCHANGE@$path@g" $SCRIPTPATH/../conf/nginx.conf
+sudo sed -i "s@ALIASTOCHANGE@$final_path/@g" $SCRIPTPATH/../conf/nginx.conf
+sudo cp $SCRIPTPATH/../conf/nginx.conf /etc/nginx/conf.d/$domain.d/$app.conf
+
+# Clone Grav Core
+sudo git clone https://github.com/getgrav/grav.git $final_path
+
+# Install Grav
+(cd $final_path && sudo php $final_path/bin/composer.phar install --no-dev -o)
+sudo chown -R www-data: $final_path
+sudo $final_path/bin/grav install
+
+# Set permissions
+sudo chown -R www-data: $final_path
+
+# Install plugin grav-admin
+if [ "$install_admin" = "Yes" ]; then
+    sudo $final_path/bin/gpm selfupgrade -f
+    sudo $final_path/bin/gpm install admin
+    sudo chown -R www-data: $final_path
+    #sudo $final_path/bin/plugin login newuser
+fi
+
+# Make app public if necessary
+sudo yunohost app setting $app is_public -v "$is_public"
+if [ "$is_public" = "Yes" ]; then
+    sudo yunohost app setting $app skipped_uris -v "/"
+fi
+
+sudo service nginx reload
+sudo yunohost app ssowatconf
