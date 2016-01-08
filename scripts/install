@@ -8,6 +8,7 @@ domain=$1
 path=$2
 is_public=$3
 install_admin=$4
+use_ssowat=$5
 
 # Removal of trailing /
     if [ "$path" = "/" ]; then
@@ -34,29 +35,37 @@ sudo sed -i "s@PATHTOCHANGE@$path@g" $SCRIPTPATH/../conf/nginx.conf
 sudo sed -i "s@ALIASTOCHANGE@$final_path/@g" $SCRIPTPATH/../conf/nginx.conf
 sudo cp $SCRIPTPATH/../conf/nginx.conf /etc/nginx/conf.d/$domain.d/$app.conf
 
-# Clone Grav Core
-sudo git clone https://github.com/getgrav/grav.git $final_path
-
-# Install Grav
+# Clone Grav Core & install Grav
+sudo git clone https://github.com/getgrav/grav.git $final_path -b master
 (cd $final_path && sudo php $final_path/bin/composer.phar install --no-dev -o)
 sudo chown -R www-data: $final_path
-sudo $final_path/bin/grav install
+(cd $final_path && sudo bin/grav install)
 
-# Set permissions
+# Set permissions (again)
 sudo chown -R www-data: $final_path
 
-# Install plugin grav-admin
+# Install grav-plugin-admin
 if [ "$install_admin" = "Yes" ]; then
-    sudo $final_path/bin/gpm selfupgrade -f
-    sudo $final_path/bin/gpm install admin
+    (cd $final_path && sudo bin/gpm selfupgrade -f)
+    (cd $final_path && sudo bin/gpm install admin)
     sudo chown -R www-data: $final_path
-    #sudo $final_path/bin/plugin login newuser
 fi
 
 # Make app public if necessary
 sudo yunohost app setting $app is_public -v "$is_public"
 if [ "$is_public" = "Yes" ]; then
-    sudo yunohost app setting $app skipped_uris -v "/"
+    sudo yunohost app setting $app unprotected_uris -v "/"
+fi
+
+# Use SSOwat for admin interface
+# add plugin to use HTTP basic auth
+# add plugin to create admin user
+if [ "$install_admin" = "Yes" ] && [ "$use_ssowat" = "Yes" ]; then
+    sudo yunohost app setting $app protected_uris -v "/admin"
+    sudo git clone https://github.com/lithrel/grav-plugin-httpbasicauth.git $final_path/user/plugins/httpbasicauth -b master
+    sudo git clone https://github.com/lithrel/grav-plugin-ynh.git $final_path/user/plugins/ynh -b master
+    sudo chown -R www-data: $final_path/user/plugins/httpbasicauth
+    sudo chown -R www-data: $final_path/user/plugins/ynh
 fi
 
 sudo service nginx reload

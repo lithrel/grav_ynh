@@ -27,7 +27,7 @@
                 "default": "/"
             },
             {
-               "name": "is_public",
+                "name": "is_public",
                 "ask": {
                     "en": "Is it a public application ?",
                     "fr": "Est-ce une page publique ?"
@@ -36,10 +36,19 @@
                 "default": "Yes"
             },
             {
-               "name": "install_admin",
+                "name": "install_admin",
                 "ask": {
                     "en": "Do you wish to install the Admin plugin ?",
                     "fr": "Souhaitez-vous installer le plugin d'administration ?"
+                },
+                "choices": ["Yes", "No"],
+                "default": "Yes"
+            },
+            {
+                "name": "use_ssowat",
+                "ask": {
+                    "en": "Use Yunohost SSOwat for admin connection ?",
+                    "fr": "Souhaitez-vous utiliser la connexion yunohost pour le plugin d'administration ?"
                 },
                 "choices": ["Yes", "No"],
                 "default": "Yes"
