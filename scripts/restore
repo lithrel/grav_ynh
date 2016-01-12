@@ -1,0 +1,19 @@
+#!/bin/bash
+# This restore script is adapted to Yunohost >=2.4
+
+# The parameter $1 is the backup directory location dedicated to the app
+backup_dir=$1
+
+# The parameter $2 is the id of the app instance ex: ynhexample__2
+app=$2
+
+path=$(sudo yunohost app setting $app directory)
+backup_file="$(ls -rt ${backup_dir}/var/www/grav/ | tail -n 1)"
+
+if [ $backup_file = "" ]; then
+    echo "No backup found."
+    exit 1
+fi
+
+sudo mkdir -p $path
+sudo unzip $backup_file -d $path

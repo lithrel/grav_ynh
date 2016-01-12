@@ -32,7 +32,7 @@ Grav has an optional admin panel, answer `Yes` if you want to use it.
 
 5. __Use Yunohost SSOwat for admin connection ?__  
 Only works if admin panel is installed.  
-If `Yes`, an admin account will be automatically created when you first visit your Grav instance, and you will be redirected to the admin panel. your authentication will be handle by your YunoHost connection.  
+If `Yes`, an admin account will be automatically created when you first visit your Grav instance, and you will be redirected to the admin panel. Your authentication will be handled by your YunoHost connection.  
 If `No`, on your first visit to your Grav instance Grav will propose you to create a new user.
 
 

@@ -11,11 +11,11 @@ install_admin=$4
 use_ssowat=$5
 
 # Removal of trailing /
-    if [ "$path" = "/" ]; then
-        echo "Installation on the root of the domain"
-    else
-        path=${path%/}
-    fi
+if [ "$path" = "/" ]; then
+    echo "Installation on the root of the domain"
+else
+    path=${path%/}
+fi
 
 # Check domain/path availability
 sudo yunohost app checkurl $domain$path -a $app \
@@ -28,10 +28,14 @@ sudo yunohost app checkurl $domain$path -a $app \
 final_path=/var/www/$app
 sudo mkdir -p $final_path
 sudo chown -R www-data: $final_path
+sudo yunohost app setting $app domain -v "$domain"
+sudo yunohost app setting $app path -v "$path"
+sudo yunohost app setting $app directory -v "$final_path"
 
 # Modify Nginx configuration file and copy it to Nginx conf directory
 sudo sed -i "s@PATHTOCHANGE@$path@g" $SCRIPTPATH/../conf/nginx.conf
 sudo sed -i "s@ALIASTOCHANGE@$final_path/@g" $SCRIPTPATH/../conf/nginx.conf
+sudo sed -i "s@ROOTTOCHANGE@$final_path@g" $SCRIPTPATH/../conf/nginx.conf
 sudo cp $SCRIPTPATH/../conf/nginx.conf /etc/nginx/conf.d/$domain.d/$app.conf
 
 # Clone Grav Core & install Grav

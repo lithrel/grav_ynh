@@ -1,0 +1,7 @@
+#!/bin/bash
+app=grav
+domain=$(sudo yunohost app setting grav domain)
+path=$(sudo yunohost app setting grav path)
+directory=$(sudo yunohost app setting grav directory)
+
+(cd $directory && sudo bin/gpm selfupgrade)
