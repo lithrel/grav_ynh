@@ -27,7 +27,7 @@ fi
 
 # Check domain/path availability
 sudo yunohost app checkurl $domain$path -a $app \
-    || ynh_die "Path not available: $domain$path")
+    || ynh_die "Path not available: $domain$path"
 
 # Save app settings
 #sudo yunohost app setting $app admin -v "$admin"
