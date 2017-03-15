@@ -83,6 +83,6 @@ Protège l'administration derrière l'authentification Yunohost.
 
 6. __Souhaitez-vous créer un administrateur automatiquement ?__  
 _Valide uniquement si le plugin d'administration est installé et privé._  
-Si `Yes`, un commpte administrateur sera automatique créé à votre première visite de votre instance Grav, et vous serez redirigé vers l'administration.
+Si `Yes`, un compte administrateur sera automatiquement créé à votre première visite de votre instance Grav, et vous serez redirigé vers l'administration.
 Votre connexion à l'administration sera associée à votre connexion YunoHost.  
 Si `No`, à votre première visite de votre instance Grav, il vous sera proposé la création d'un nouvel utilisateur.
