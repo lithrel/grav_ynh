@@ -1,10 +1,25 @@
 {
     "name": "Grav",
     "id": "grav",
+    "packaging_format": 1,
     "description": {
         "en": "Modern Open Source Flat-File CMS",
         "fr": "CMS Flat-File Moderne et Open Source"
     },
+    "url": "https://getgrav.org/",
+    "license" : "MIT",
+    "maintainer": {
+        "name": "lithrel",
+        "email": "lithrel@randomdomainname.net"
+    },
+    "requirements": {
+        "yunohost": ">= 2.5.0"
+    },
+    "multi_instance": true,
+    "services": [
+        "nginx",
+        "php5-fpm"
+    ],
     "arguments": {
         "install" : [
             {
@@ -24,7 +39,7 @@
                     "fr": "Choisissez un chemin pour Grav"
                 },
                 "example": "/grav",
-                "default": "/"
+                "default": "/grav"
             },
             {
                 "name": "is_public",
@@ -45,10 +60,19 @@
                 "default": "Yes"
             },
             {
-                "name": "use_ssowat",
+                "name": "private_admin",
                 "ask": {
-                    "en": "Use Yunohost SSOwat for admin connection ?",
-                    "fr": "Souhaitez-vous utiliser la connexion yunohost pour le plugin d'administration ?"
+                    "en": "Make admin panel private ?",
+                    "fr": "Souhaitez-vous rendre l'administration privée ?"
+                },
+                "choices": ["Yes", "No"],
+                "default": "Yes"
+            },
+            {
+                "name": "create_admin",
+                "ask": {
+                    "en": "Create administrator automatically ?",
+                    "fr": "Souhaitez-vous créer un administrateur automatiquement ?"
                 },
                 "choices": ["Yes", "No"],
                 "default": "Yes"

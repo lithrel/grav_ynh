@@ -1,14 +1,22 @@
 #!/bin/bash
-set -e
-app=grav
+
+# Exit on command errors and treat unset variables as an error
+set -eu
+
+app=$YNH_APP_INSTANCE_NAME
+version=1.1.17
 SCRIPTPATH=$( cd $(dirname $0) ; pwd -P )
 
 # Retrieve arguments
-domain=$1
-path=$2
-is_public=$3
-install_admin=$4
-use_ssowat=$5
+domain=$YNH_APP_ARG_DOMAIN
+path=$YNH_APP_ARG_PATH
+is_public=$YNH_APP_ARG_IS_PUBLIC
+install_admin=$YNH_APP_ARG_INSTALL_ADMIN
+private_admin=$YNH_APP_ARG_PRIVATE_ADMIN
+create_admin=$YNH_APP_ARG_CREATE_ADMIN
+
+# Source YunoHost helpers
+. /usr/share/yunohost/helpers
 
 # Removal of trailing /
 if [ "$path" = "/" ]; then
@@ -19,7 +27,7 @@ fi
 
 # Check domain/path availability
 sudo yunohost app checkurl $domain$path -a $app \
-    || (echo "Path not available: $domain$path" && exit 1)
+    || ynh_die "Path not available: $domain$path")
 
 # Save app settings
 #sudo yunohost app setting $app admin -v "$admin"
@@ -28,17 +36,28 @@ sudo yunohost app checkurl $domain$path -a $app \
 final_path=/var/www/$app
 sudo mkdir -p $final_path
 sudo chown -R www-data: $final_path
-sudo yunohost app setting $app domain -v "$domain"
-sudo yunohost app setting $app path -v "$path"
-sudo yunohost app setting $app directory -v "$final_path"
+
+# App options
+ynh_app_setting_set "$app" domain "$domain"
+ynh_app_setting_set "$app" path "$path"
+ynh_app_setting_set "$app" directory "$final_path"
 
 # Modify Nginx configuration file and copy it to Nginx conf directory
-sudo sed -i "s@PATHTOCHANGE@$path@g" $SCRIPTPATH/../conf/nginx.conf
-sudo sed -i "s@ALIASTOCHANGE@$final_path/@g" $SCRIPTPATH/../conf/nginx.conf
-sudo sed -i "s@ROOTTOCHANGE@$final_path@g" $SCRIPTPATH/../conf/nginx.conf
-sudo cp $SCRIPTPATH/../conf/nginx.conf /etc/nginx/conf.d/$domain.d/$app.conf
+if [ "$path" = "/" ]; then
+    sudo sed -i "s@YNH_WWW_ROOT@$final_path@g" ../conf/nginx.conf
+    sudo sed -i "s@YNH_WWW_LOC@$path@g" ../conf/nginx.conf
+    sudo sed -i "s@YNH_WWW_TRY@@g" ../conf/nginx.conf
+else
+    path=${path%/}
+    sudo sed -i "s@YNH_WWW_ROOT@/var/www@g" ../conf/nginx.conf
+    sudo sed -i "s@YNH_WWW_LOC@$path@g" ../conf/nginx.conf
+    sudo sed -i "s@YNH_WWW_TRY@$path@g" ../conf/nginx.conf
+fi
+sudo cp ../conf/nginx.conf /etc/nginx/conf.d/$domain.d/$app.conf
+
 
 # Clone Grav Core & install Grav
+echo "Cloning grav..."
 sudo git clone https://github.com/getgrav/grav.git $final_path -b master
 (cd $final_path && sudo php $final_path/bin/composer.phar install --no-dev -o)
 sudo chown -R www-data: $final_path
@@ -47,25 +66,32 @@ sudo chown -R www-data: $final_path
 # Set permissions (again)
 sudo chown -R www-data: $final_path
 
+# Make app public if necessary
+ynh_app_setting_set "$app" is_public "$is_public"
+if [ "$is_public" = "Yes" ]; then
+    ynh_app_setting_set "$app" unprotected_uris "/"
+fi
+
 # Install grav-plugin-admin
 if [ "$install_admin" = "Yes" ]; then
+    echo "[Grav] self-upgrade..."
     (cd $final_path && sudo bin/gpm selfupgrade -f)
+    echo "[Grav] installing admin plugin..."
     (cd $final_path && sudo bin/gpm install -n admin)
     sudo chown -R www-data: $final_path
 fi
 
-# Make app public if necessary
-sudo yunohost app setting $app is_public -v "$is_public"
-if [ "$is_public" = "Yes" ]; then
-    sudo yunohost app setting $app unprotected_uris -v "/"
+# Make admin protected (if site is not)
+if [ "$private_admin" = "Yes" ] && [ "$is_public" = "Yes" ]; then
+    ynh_app_setting_set "$app" protected_uris "/admin"
 fi
 
 # Use SSOwat for admin interface
-# add plugin to use HTTP basic auth
-# add plugin to create admin user
-if [ "$install_admin" = "Yes" ] && [ "$use_ssowat" = "Yes" ]; then
-    sudo yunohost app setting $app protected_uris -v "/admin"
+# add grav-plugin-httpbasicauth to use HTTP basic auth
+# add grav-plugin-ynh to create first admin user
+if [ "$install_admin" = "Yes" ] && [ "$private_admin" = "Yes" ] && [ "$create_admin" = "Yes" ]; then
     (cd $final_path && sudo bin/gpm install -n httpbasicauth)
+    echo "Cloning grav-plugin-ynh..."
     sudo git clone https://github.com/lithrel/grav-plugin-ynh.git $final_path/user/plugins/ynh -b master
     sudo chown -R www-data: $final_path/user/plugins/httpbasicauth
     sudo chown -R www-data: $final_path/user/plugins/ynh

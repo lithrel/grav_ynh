@@ -1,7 +1,9 @@
 #!/bin/bash
-app=grav
-domain=$(sudo yunohost app setting grav domain)
-path=$(sudo yunohost app setting grav path)
-directory=$(sudo yunohost app setting grav directory)
+set -eu
+
+app=$YNH_APP_INSTANCE_NAME
+domain=$(sudo ynh_app_setting_get "$app" domain)
+path=$(sudo ynh_app_setting_get "$app" path)
+directory=$(sudo ynh_app_setting_get "$app" directory)
 
 (cd $directory && sudo bin/gpm selfupgrade)
