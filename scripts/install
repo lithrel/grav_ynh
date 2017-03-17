@@ -3,84 +3,86 @@
 # Exit on command errors and treat unset variables as an error
 set -eu
 
-app=$YNH_APP_INSTANCE_NAME
-version=1.1.17
-SCRIPTPATH=$( cd $(dirname $0) ; pwd -P )
+source .fonctions	# Loads the generic functions usually used in the script
+source /usr/share/yunohost/helpers # Source app helpers
 
-# Retrieve arguments
+CLEAN_SETUP () {
+	# Clean installation residues that are not supported by the remove script.
+	# Clean hosts
+	sudo sed -i '/#GRAV/d' /etc/hosts
+}
+TRAP_ON	# Active trap to stop the script if an error is detected.
+
 domain=$YNH_APP_ARG_DOMAIN
 path=$YNH_APP_ARG_PATH
+language=$YNH_APP_ARG_LANGUAGE
+multisite=$YNH_APP_ARG_MULTISITE
 is_public=$YNH_APP_ARG_IS_PUBLIC
 install_admin=$YNH_APP_ARG_INSTALL_ADMIN
 private_admin=$YNH_APP_ARG_PRIVATE_ADMIN
 create_admin=$YNH_APP_ARG_CREATE_ADMIN
 
-# Source YunoHost helpers
-. /usr/share/yunohost/helpers
+app=$YNH_APP_INSTANCE_NAME
 
-# Removal of trailing /
-if [ "$path" = "/" ]; then
-    echo "Installation on the root of the domain"
-else
-    path=${path%/}
-fi
+CHECK_VAR "$app" "app name not set"
 
-# Check domain/path availability
-sudo yunohost app checkurl $domain$path -a $app \
-    || ynh_die "Path not available: $domain$path"
+CHECK_PATH
 
-# Save app settings
-#sudo yunohost app setting $app admin -v "$admin"
+CHECK_DOMAINPATH
 
-# Create source directory
-final_path=/var/www/$app
-sudo mkdir -p $final_path
-sudo chown -R www-data: $final_path
+CHECK_FINALPATH
 
-# App options
-ynh_app_setting_set "$app" domain "$domain"
-ynh_app_setting_set "$app" path "$path"
-ynh_app_setting_set "$app" directory "$final_path"
+ynh_app_setting_set $app domain $domain
+ynh_app_setting_set $app path $path
+ynh_app_setting_set $app is_public $is_public
+ynh_app_setting_set $app language $language
+ynh_app_setting_set $app multisite $multisite
 
-# Modify Nginx configuration file and copy it to Nginx conf directory
-if [ "$path" = "/" ]; then
-    sudo sed -i "s@YNH_WWW_ROOT@$final_path@g" ../conf/nginx.conf
-    sudo sed -i "s@YNH_WWW_LOC@$path@g" ../conf/nginx.conf
-    sudo sed -i "s@YNH_WWW_TRY@@g" ../conf/nginx.conf
-else
-    path=${path%/}
-    sudo sed -i "s@YNH_WWW_ROOT@/var/www@g" ../conf/nginx.conf
-    sudo sed -i "s@YNH_WWW_LOC@$path@g" ../conf/nginx.conf
-    sudo sed -i "s@YNH_WWW_TRY@$path@g" ../conf/nginx.conf
-fi
-sudo cp ../conf/nginx.conf /etc/nginx/conf.d/$domain.d/$app.conf
-
-
-# Clone Grav Core & install Grav
-echo "Cloning grav..."
-sudo git clone https://github.com/getgrav/grav.git $final_path -b master
-(cd $final_path && sudo php $final_path/bin/composer.phar install --no-dev -o)
-sudo chown -R www-data: $final_path
-(cd $final_path && sudo bin/grav install)
-
-# Set permissions (again)
-sudo chown -R www-data: $final_path
-
-# Make app public if necessary
-ynh_app_setting_set "$app" is_public "$is_public"
-if [ "$is_public" = "Yes" ]; then
-    ynh_app_setting_set "$app" unprotected_uris "/"
-fi
+# Creates the destination directory and stores its location.
+sudo mkdir "$final_path"
+ynh_app_setting_set $app final_path $final_path
 
 # Install grav-plugin-admin
 if [ "$install_admin" = "Yes" ]; then
-    echo "[Grav] self-upgrade..."
-    (cd $final_path && sudo bin/gpm selfupgrade -f)
-    echo "[Grav] installing admin plugin..."
-    (cd $final_path && sudo bin/gpm install -n admin)
-    sudo chown -R www-data: $final_path
+    SETUP_SOURCE "core-admin" "grav-admin-v1.1.17.zip"
+else
+    SETUP_SOURCE "core" "grav-v1.1.17.zip"
 fi
 
+# Grav install
+sudo $final_path/bin/grav
+
+# Set permissions
+sudo chown -R www-data: $final_path
+
+echo -e "127.0.0.1 $domain #GRAV" | sudo tee -a /etc/hosts
+
+# Copy nginx config
+sudo cp ../conf/nginx.conf /etc/nginx/conf.d/$domain.d/$app.conf
+
+# Modif the variables in the nginx configuration file
+sudo sed -i "s@__PATHTOCHANGE__@$path@g" /etc/nginx/conf.d/$domain.d/$app.conf
+sudo sed -i "s@__FINALPATH__@$final_path@g" /etc/nginx/conf.d/$domain.d/$app.conf
+sudo sed -i "s@__NAMETOCHANGE__@$app@g" /etc/nginx/conf.d/$domain.d/$app.conf
+
+if [ "$multisite" = "Yes" ];
+then
+	sudo sed -i "s@#--MULTISITE--@@g" /etc/nginx/conf.d/$domain.d/$app.conf
+fi
+
+if [ "$is_public" = "Yes" ];
+then
+	sudo sed -i "s@#--PRIVATE--@@g" /etc/nginx/conf.d/$domain.d/$app.conf
+fi
+
+POOL_FPM
+
+# Setup SSOwat
+ynh_app_setting_set "$app" is_public "$is_public"
+if [ "$is_public" = "Yes" ];
+then
+  ynh_app_setting_set "$app" unprotected_uris "/"
+fi
 # Make admin protected (if site is not)
 if [ "$private_admin" = "Yes" ] && [ "$is_public" = "Yes" ]; then
     ynh_app_setting_set "$app" protected_uris "/admin"
@@ -100,5 +102,12 @@ fi
 # Set permissions (one last time)
 sudo chown -R www-data: $final_path
 
-sudo service nginx reload
+# Reload SSOwat configuration
 sudo yunohost app ssowatconf
+
+# Reload Nginx and regenerate SSOwat conf
+sudo service php5-fpm restart
+sudo service nginx reload
+
+# Nettoyer hosts
+sudo sed -i '/#GRAV/d' /etc/hosts

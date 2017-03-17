@@ -1,16 +1,22 @@
 #!/bin/bash
+
+# Exit on command errors and treat unset variables as an error
 set -eu
 
-# The parameter $1 is the backup directory location dedicated to the app
-backup_dir=$YNH_APP_BACKUP_DIR
-
-# The parameter $2 is the id of the app instance ex: ynhexample__2
+# Get multi-instances specific variables
 app=$YNH_APP_INSTANCE_NAME
 
-path=$(sudo ynh_app_setting_get "$app" directory)
+source /usr/share/yunohost/helpers # Source app helpers
 
-cd $path
-sudo bin/grav backup
-sudo mkdir -p ${backup_dir}/var/www/grav
-backup_file="$(ls -rt backup/ | tail -n 1)"
-sudo cp backup/$backup_file ${backup_dir}/var/www/grav/
+# Retrieve app settings
+domain=$(ynh_app_setting_get "$app" domain)
+final_path=$(ynh_app_setting_get "$app" final_path)
+
+# Copy the app files
+ynh_backup "$final_path" "sources" 1
+
+# Copy the nginx conf files
+ynh_backup "/etc/nginx/conf.d/${domain}.d/${app}.conf" "nginx.conf"
+# Copy the php-fpm conf files
+ynh_backup "/etc/php5/fpm/pool.d/${app}.conf" "php-fpm.conf"
+ynh_backup "/etc/php5/fpm/conf.d/20-${app}.ini" "php-fpm.ini"
